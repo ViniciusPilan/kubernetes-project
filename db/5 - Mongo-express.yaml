@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deploy-me
+  namespace: db
+  labels:
+    app: mongo-express
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mongo-express
+  template:
+    metadata:
+      labels:
+        app: mongo-express
+    spec:
+      nodeSelector:
+        for: storage
+      containers:
+      - name: mongo-express
+        image: mongo-express:1.0.0-alpha.4
+        ports:
+        - containerPort: 8081
+        resources:
+          requests:
+            cpu: 0.02
+            memory: 32Mi
+          limits:
+            cpu: 0.150
+            memory: 256Mi
+        volumeMounts:
+        - name: secret-volume
+          readOnly: true
+          mountPath: /etc/secret-volume
+        env:
+        - name: ME_CONFIG_MONGODB_AUTH_USERNAME_FILE 
+          value: /etc/secret-volume/USER_NAME
+        - name: ME_CONFIG_MONGODB_AUTH_PASSWORD_FILE
+          value: /etc/secret-volume/PASSWORD
+        - name: ME_CONFIG_MONGODB_SERVER
+          valueFrom:
+            configMapKeyRef:
+              name: db-cm
+              key: server
+        - name: ME_CONFIG_SITE_BASEURL
+          valueFrom:
+            configMapKeyRef:
+              name: db-cm
+              key: base_url
+        
+      volumes:
+        - name: secret-volume
+          secret:
+            secretName: db-secret
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: me-svc
+  namespace: db
+  labels:
+    app: mongo-express-svc
+spec:
+  type: LoadBalancer
+  selector:
+    app: mongo-express
+  ports:
+  - port: 8081
+    nodePort: 30001
